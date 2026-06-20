@@ -113,17 +113,17 @@ export default function Dashboard() {
           />
 
           <div className="flex space-x-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
-            {["All", "Applied", "Interviewing", "Offer", "Rejected"].map((status) => (
+            {["All", "Full-time", "Part-time", "Internship"].map((jobType) => (
               <button
-                key={status}
-                onClick={() => handleFilterChange(status)}
+                key={jobType}
+                onClick={() => handleFilterChange(jobType)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                  filter === status
+                  filter === jobType
                     ? "bg-black text-white"
                     : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
-                {status}
+                {jobType}
               </button>
             ))}
           </div>

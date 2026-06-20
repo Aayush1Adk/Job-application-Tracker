@@ -4,7 +4,7 @@ import { Application } from "../types";
 
 export function useApplications() {
   const [applications, setApplications] = useState<Application[]>([]);
-  const [filter, setFilter] = useState<string>("All");
+  const [filter, setFilter] = useState<string>("All"); // now filters by job_type
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -52,8 +52,8 @@ export function useApplications() {
     setCurrentPage(1);
   };
 
-  const handleFilterChange = (status: string) => {
-    setFilter(status);
+  const handleFilterChange = (jobType: string) => {
+    setFilter(jobType);
     setCurrentPage(1);
   };
 

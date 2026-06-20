@@ -1,4 +1,14 @@
 
+const isAppliedDateInFuture = (applied_date) => {
+    const appliedDate = new Date(applied_date);
+
+    const todayWithBuffer = new Date();
+    todayWithBuffer.setUTCHours(0, 0, 0, 0);
+    todayWithBuffer.setUTCDate(todayWithBuffer.getUTCDate() + 1);
+
+    return appliedDate > todayWithBuffer;
+};
+
 const validateApplication = (req, res, next) => {
     let { company_name, job_title, job_type, status, applied_date } = req.body;
 
@@ -13,11 +23,11 @@ const validateApplication = (req, res, next) => {
     }
 
     if (company_name.length < 3) {
-        return res.status(400).json({ message: "company name must be greater than 3 characters" });
+        return res.status(400).json({ message: "company name must be at least 3 characters" });
     }
 
     if (job_title.length < 3) {
-        return res.status(400).json({ message: "job title must be greater than 3 characters" });
+        return res.status(400).json({ message: "job title must be at least 3 characters" });
     }
 
     if (company_name.length > 150 ) {
@@ -40,12 +50,11 @@ const validateApplication = (req, res, next) => {
         return res.status(400).json({ message: "Invalid status" });
     }
 
+    if (isNaN(Date.parse(applied_date))) {
+        return res.status(400).json({ message: "Invalid applied date" });
+    }
 
-    const appliedDate = new Date(applied_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (appliedDate > today) {
+    if (isAppliedDateInFuture(applied_date)) {
         return res.status(400).json({ message: "Applied date cannot be in the future" });
     }
 
@@ -97,11 +106,7 @@ const validateUpdateApplication = (req, res, next) => {
         if (isNaN(Date.parse(applied_date))) {
             return res.status(400).json({ message: "Invalid applied date" });
         }
-        // Validate applied_date is not in the future
-        const appliedDateObj = new Date(applied_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (appliedDateObj > today) {
+        if (isAppliedDateInFuture(applied_date)) {
             return res.status(400).json({ message: "Applied date cannot be in the future" });
         }
     }

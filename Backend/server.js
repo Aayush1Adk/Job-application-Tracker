@@ -16,38 +16,3 @@ pool.query("SELECT NOW()")
   });
 
   
-/*
-CREATE TABLE applications (
-    id SERIAL PRIMARY KEY,
-
-    company_name VARCHAR(255) NOT NULL,
-
-    job_title VARCHAR(255) NOT NULL,
-
-    job_type VARCHAR(50) NOT NULL
-    CHECK (
-        job_type IN (
-            'Internship',
-            'Full-time',
-            'Part-time'
-        )
-    ),
-
-    status VARCHAR(50) NOT NULL
-    CHECK (
-        status IN (
-            'Applied',
-            'Interviewing',
-            'Offer',
-            'Rejected'
-        )
-    ),
-
-    applied_date DATE NOT NULL,
-
-    notes TEXT,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-); */
