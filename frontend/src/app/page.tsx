@@ -1,89 +1,104 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { api } from "../lib/api";
 import ApplicationCard from "../components/ApplicationCard";
+import ApplicationForm from "../components/ApplicationForm";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import { useApplications } from "../hooks/useApplications";
 import { Application } from "../types";
 
-// 1. Tell TypeScript exactly what an Application looks like based on your database
-
-
 export default function Dashboard() {
+  const {
+    applications,
+    filter,
+    searchQuery,
+    currentPage,
+    totalPages,
+    loading,
+    error,
+    loadApps,
+    setCurrentPage,
+    handleSearchChange,
+    handleFilterChange,
+  } = useApplications();
 
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [filter, setFilter] = useState<string>("All");
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [editingApp, setEditingApp] = useState<Application | null>(null);
+  const [formError, setFormError] = useState<string>("");
 
-  useEffect(() => {
-    let isCurrent = true;
+  const [deleteTarget, setDeleteTarget] = useState<Application | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string>("");
 
-    const loadApps = async () => {
-      setLoading(true);
-      try {
-        const response = await api.getApplications(
-          filter === "All" ? undefined : filter, 
-          searchQuery, 
-          currentPage
-        );
-
-        if (!isCurrent) return;
-
-
-        if (response && response.data && Array.isArray(response.data)) {
-          setApplications(response.data);
-        } else if (Array.isArray(response)) {
-          setApplications(response);
-        } else {
-          setApplications([]);
-        }
-
-        setTotalPages(response?.pagination?.totalPages || 1);
-        setError("");
-      } catch (err) {
-        if (!isCurrent) return;
-        setError("Failed to load applications from server");
-        setApplications([]);
-        console.error(err);
-      } finally {
-        if (isCurrent) setLoading(false);
-      }
-    };
-
-    const delayDebounceFn = setTimeout(() => {
-      loadApps();
-    }, 300);
-
-    return () => {
-      isCurrent = false;
-      clearTimeout(delayDebounceFn);
-    };
-  }, [filter, searchQuery, currentPage]);
-
-
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
+  const openAddForm = () => {
+    setEditingApp(null);
+    setFormError("");
+    setIsFormOpen(true);
   };
 
-  const handleFilterChange = (status: string) => {
-    setFilter(status);
-    setCurrentPage(1);
+  const openEditForm = (app: Application) => {
+    setEditingApp(app);
+    setFormError("");
+    setIsFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingApp(null);
+    setFormError("");
+  };
+
+  const handleFormSubmit = async (data: Application) => {
+    try {
+      setFormError("");
+      if (editingApp && editingApp.id !== undefined) {
+        await api.updateApplication(String(editingApp.id), data);
+      } else {
+        await api.createApplication(data);
+      }
+      closeForm();
+      await loadApps();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save application";
+      setFormError(message);
+      throw err;
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteTarget.id === undefined) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await api.deleteApplication(String(deleteTarget.id));
+      setDeleteTarget(null);
+
+      if (applications.length === 1 && currentPage > 1) {
+        setCurrentPage((p) => p - 1);
+      } else {
+        await loadApps();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete application";
+      setDeleteError(message);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
     <main className="min-h-screen bg-gray-50 p-8 text-gray-900">
       <div className="max-w-5xl mx-auto">
-        
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-black">Job Applications</h1>
             <p className="text-gray-500 mt-1">Track and manage your job hunt efficiently.</p>
           </div>
-          <button className="bg-black text-white px-5 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-colors">
+          <button
+            onClick={openAddForm}
+            className="bg-black text-white px-5 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+          >
             + Add Application
           </button>
         </div>
@@ -96,7 +111,7 @@ export default function Dashboard() {
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full sm:w-72 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-black focus:outline-none bg-white"
           />
-          
+
           <div className="flex space-x-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">
             {["All", "Applied", "Interviewing", "Offer", "Rejected"].map((status) => (
               <button
@@ -127,9 +142,13 @@ export default function Dashboard() {
             <div className="text-center py-10 text-gray-500">No applications found.</div>
           ) : (
             <div className="flex flex-col">
-              {/* 3. Replaced 'any' with 'Application' */}
-              {applications.map((app: Application) => (
-                <ApplicationCard key={app.id} app={app} />
+              {applications.map((app) => (
+                <ApplicationCard
+                  key={app.id}
+                  app={app}
+                  onEdit={openEditForm}
+                  onDelete={setDeleteTarget}
+                />
               ))}
             </div>
           )}
@@ -144,11 +163,11 @@ export default function Dashboard() {
             >
               Previous
             </button>
-            
+
             <span className="text-sm font-medium text-gray-700">
               Page {currentPage} of {totalPages}
             </span>
-            
+
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
@@ -158,8 +177,26 @@ export default function Dashboard() {
             </button>
           </div>
         )}
-
       </div>
+
+      {isFormOpen && (
+        <ApplicationForm initialData={editingApp} onSubmit={handleFormSubmit} onCancel={closeForm} />
+      )}
+      {isFormOpen && formError && (
+        <div className="fixed bottom-4 right-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg shadow-lg z-[60]">
+          {formError}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          app={deleteTarget}
+          isDeleting={isDeleting}
+          error={deleteError}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </main>
   );
 }
