@@ -23,99 +23,67 @@ const getApplicationById = async (req, res) => {
     }
 };
 
+const buildApplicationFilters = (query) => {
+    const { status, job_type, applied_date, search } = query;
+
+    const conditions = [];
+    const values = [];
+
+    if (status) {
+        values.push(status);
+        conditions.push(`status = $${values.length}`);
+    }
+
+    if (job_type) {
+        values.push(job_type);
+        conditions.push(`job_type = $${values.length}`);
+    }
+
+    if (applied_date) {
+        values.push(applied_date);
+        conditions.push(`applied_date = $${values.length}`);
+    }
+
+    if (search) {
+        values.push(`%${search}%`);
+        const idx = values.length;
+        conditions.push(
+            `(company_name ILIKE $${idx} OR job_title ILIKE $${idx} OR job_type ILIKE $${idx} OR COALESCE(notes,'') ILIKE $${idx})`
+        );
+    }
+
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
+
+    return { whereClause, values };
+};
+
 const getApplication = async (req, res) => {
     try {
+        const { sortBy, order, page, limit } = req.query;
 
-        const { status, job_type, applied_date, search, sortBy, order, page, limit } = req.query;
-
-        let query = "SELECT * FROM applications";
-        let conditions = [];
-        let values = [];
-
-        if (status) {
-            conditions.push(`status = $${values.length + 1}`);
-            values.push(status);
-        }
-
-        if (job_type) {
-            conditions.push(`job_type = $${values.length + 1}`);
-            values.push(job_type);
-        }
-
-        if (applied_date) {
-            conditions.push(`applied_date = $${values.length + 1}`);
-            values.push(applied_date);
-        }
-
-if (search) {
-    conditions.push(
-        `(company_name ILIKE $${values.length + 1}
-        OR job_title ILIKE $${values.length + 1}
-        OR job_type ILIKE $${values.length + 1}
-        OR COALESCE(notes,'') ILIKE $${values.length + 1})`
-    );
-
-    values.push(`%${search}%`);
-}
-
-        if (conditions.length > 0) 
-            {
-            query += " WHERE " + conditions.join(" AND ");
-            }
-
+        const { whereClause, values } = buildApplicationFilters(req.query);
 
         const validSortFields = ['id', 'company_name', 'job_title', 'job_type', 'status', 'applied_date', 'created_at', 'updated_at'];
         const sortField = sortBy && validSortFields.includes(sortBy) ? sortBy : 'created_at';
         const sortOrder = order && order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-        query += ` ORDER BY ${sortField} ${sortOrder}`;
-
 
         const pageNum = parseInt(page) || 1;
         const limitNum = parseInt(limit) || 10;
         const offset = (pageNum - 1) * limitNum;
 
-        query += ` LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
-        values.push(limitNum);
-        values.push(offset);
+        const listValues = [...values, limitNum, offset];
+        const listQuery =
+            `SELECT * FROM applications${whereClause} ` +
+            `ORDER BY ${sortField} ${sortOrder} ` +
+            `LIMIT $${values.length + 1} OFFSET $${values.length + 2}`;
 
-        const result = await pool.query(query, values);
+        const countQuery = `SELECT COUNT(*) as total FROM applications${whereClause}`;
 
-        let countQuery = "SELECT COUNT(*) as total FROM applications";
-        let countValues = [];
-        
-        if (conditions.length > 0) {
-            
-            let countConditions = [];
-            let tempValues = [];
-            
-            if (status) {
-                countConditions.push(`status = $${tempValues.length + 1}`);
-                tempValues.push(status);
-            }
-            if (job_type) {
-                countConditions.push(`job_type = $${tempValues.length + 1}`);
-                tempValues.push(job_type);
-            }
-            if (applied_date) {
-                countConditions.push(`applied_date = $${tempValues.length + 1}`);
-                tempValues.push(applied_date);
-            }
-if (search) {
-    countConditions.push(
-        `(company_name ILIKE $${tempValues.length + 1}
-        OR job_title ILIKE $${tempValues.length + 1}
-        OR job_type ILIKE $${tempValues.length + 1}
-        OR notes ILIKE $${tempValues.length + 1})`
-    );
+        const [result, countResult] = await Promise.all([
+            pool.query(listQuery, listValues),
+            pool.query(countQuery, values),
+        ]);
 
-    tempValues.push(`%${search}%`);
-}
-            
-            countQuery += " WHERE " + countConditions.join(" AND ");
-            countValues = tempValues;
-        }
-
-        const countResult = await pool.query(countQuery, countValues);
         const total = parseInt(countResult.rows[0].total);
 
         res.status(200).json({
@@ -135,36 +103,37 @@ if (search) {
     }
 };
 
-
-    const createApplication = async (req, res) => {
-        try {
-            const application = await pool.query(
-                `INSERT INTO applications (company_name, job_title, job_type, status, applied_date, notes) 
-                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, 
-                [
-                    req.body.company_name?.trim(),
-                    req.body.job_title?.trim(),
-                    req.body.job_type?.trim(),
-                    req.body.status?.trim(),
-                    req.body.applied_date,
-                    req.body.notes?.trim() || null
-                ]
-            );
-            
-            if (!application.rows || application.rows.length === 0) {
-                return res.status(500).json({ message: "Failed to create application" });
-            }
-            
-            res.status(201).json(application.rows[0]);
+const createApplication = async (req, res) => {
+    try {
+        const application = await pool.query(
+            `INSERT INTO applications (company_name, job_title, job_type, status, applied_date, notes) 
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, 
+            [
+                req.body.company_name?.trim(),
+                req.body.job_title?.trim(),
+                req.body.job_type?.trim(),
+                req.body.status?.trim(),
+                req.body.applied_date,
+                req.body.notes?.trim() || null
+            ]
+        );
+        
+        if (!application.rows || application.rows.length === 0) {
+            return res.status(500).json({ message: "Failed to create application" });
         }
-        catch (error) {
-            console.error("createApplication error:", error.message);
-            if (error.code === '23514') {
-                return res.status(400).json({ message: "Invalid data: check constraints failed" });
-            }
-            res.status(500).json({ message: "Server Error" });
-        }
+        
+        res.status(201).json(application.rows[0]);
     }
+    catch (error) {
+        console.error("createApplication error:", error.message);
+        if (error.code === '23514') {
+            return res.status(400).json({ message: "Invalid data: check constraints failed" });
+        }
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+
 
     const updateApplication = async (req, res) => {
         try {

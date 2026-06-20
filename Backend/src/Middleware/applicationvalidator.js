@@ -22,11 +22,11 @@ const validateApplication = (req, res, next) => {
         return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (company_name.length < 3) {
+    if (company_name.length < 2) {
         return res.status(400).json({ message: "company name must be at least 3 characters" });
     }
 
-    if (job_title.length < 3) {
+    if (job_title.length < 2) {
         return res.status(400).json({ message: "job title must be at least 3 characters" });
     }
 
@@ -72,7 +72,7 @@ const validateUpdateApplication = (req, res, next) => {
 
     if (company_name !== undefined) {
         const trimmedName = company_name.trim();
-        if (trimmedName.length < 3) {
+        if (trimmedName.length < 2) {
             return res.status(400).json({ message: "Company name must be at least 3 characters" });
         }
         if (trimmedName.length > 150) {
@@ -82,7 +82,7 @@ const validateUpdateApplication = (req, res, next) => {
 
     if (job_title !== undefined) {
         const trimmedTitle = job_title.trim();
-        if (trimmedTitle.length < 3) {
+        if (trimmedTitle.length < 2) {
             return res.status(400).json({ message: "Job title must be at least 3 characters" });
         }
         if (trimmedTitle.length > 150) {
